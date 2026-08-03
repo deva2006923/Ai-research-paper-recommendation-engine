@@ -1,0 +1,46 @@
+.electric-border-container {
+  position: relative;
+  padding: 1px;
+  border-radius: var(--radius-lg);
+  background: var(--border);
+  overflow: hidden;
+  transition: border-color 0.3s ease;
+  width: 100%;
+}
+
+.electric-border-glow {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--glow-color) 120deg,
+    transparent 240deg,
+    var(--glow-color) 360deg
+  );
+  animation: rotate-glow 6s linear infinite;
+  opacity: calc(var(--glow-intensity) * 5); /* Scales based on intensity */
+  pointer-events: none;
+  filter: blur(8px);
+}
+
+.electric-border-inner {
+  position: relative;
+  background: var(--surface);
+  border-radius: calc(var(--radius-lg) - 1px);
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+@keyframes rotate-glow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

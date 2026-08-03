@@ -1,0 +1,35 @@
+# Python ignores
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+*.db
+*.sqlite
+
+# Environment variables
+.env
+.env.local
+
+# Frontend node modules and build targets
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Editor and OS settings
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.agents/
+.gemini/
