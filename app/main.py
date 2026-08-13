@@ -11,25 +11,31 @@ from app.auth import get_password_hash
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Seed admin user if it doesn't exist
-    db = SessionLocal()
     try:
-        admin_email = "prakasshdeva876@gmail.com"
-        admin = db.query(User).filter(User.email == admin_email).first()
-        if not admin:
-            hashed_password = get_password_hash(settings.ADMIN_PASSWORD)
-            admin = User(
-                email=admin_email,
-                name="Admin User",
-                hashed_password=hashed_password
-            )
-            db.add(admin)
-            db.commit()
-    finally:
-        db.close()
+        db = SessionLocal()
+        try:
+            admin_email = "prakasshdeva876@gmail.com"
+            admin = db.query(User).filter(User.email == admin_email).first()
+            if not admin:
+                hashed_password = get_password_hash(settings.ADMIN_PASSWORD)
+                admin = User(
+                    email=admin_email,
+                    name="Admin User",
+                    hashed_password=hashed_password
+                )
+                db.add(admin)
+                db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"Warning: Lifespan admin seeding error: {e}")
     yield
 
-# Initialize database tables on application start
-Base.metadata.create_all(bind=engine)
+# Initialize database tables safely on application start
+try:
+    Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"Warning: Database table creation error: {e}")
 
 app = FastAPI(
     title="AI Research Paper Recommendation Engine API",
