@@ -11,12 +11,16 @@ ENV_FILE_PATH = BASE_DIR / ".env"
 # Explicitly load .env from the project root
 load_dotenv(dotenv_path=ENV_FILE_PATH)
 
+# Detect if running in Vercel serverless environment
+IS_VERCEL = bool(os.getenv("VERCEL") or os.getenv("VERCEL_ENV"))
+DEFAULT_DB_URL = "sqlite:////tmp/app.db" if IS_VERCEL else f"sqlite:///{BASE_DIR}/app.db"
+
 class Settings(BaseSettings):
     PORT: int = 8000
     HOST: str = "0.0.0.0"
     
-    # Use absolute path for SQLite to prevent issues when starting from nested dirs
-    DATABASE_URL: str = f"sqlite:///{BASE_DIR}/app.db"
+    # Use /tmp/app.db when deployed on Vercel read-only filesystem
+    DATABASE_URL: str = DEFAULT_DB_URL
     
     JWT_SECRET_KEY: str = "dev_secret_key_1234567890_change_in_production"
     JWT_ALGORITHM: str = "HS256"
@@ -29,7 +33,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: Optional[str] = None
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
     
-    ADMIN_PASSWORD: str
+    ADMIN_PASSWORD: str = "admin123"
     
     model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
 
