@@ -11,6 +11,6 @@ try:
     from app.main import app
 except Exception as e:
     import traceback
-    print("Vercel Serverless Function Startup Error:", e)
+    print("CRITICAL: Vercel Serverless Function Startup Error:", e, flush=True)
     traceback.print_exc()
     raise e

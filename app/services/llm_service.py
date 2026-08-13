@@ -1,3 +1,4 @@
+import asyncio
 import json
 from groq import Groq
 from typing import List, Dict, Any, Optional
@@ -13,7 +14,7 @@ def _get_client() -> Optional[Groq]:
     if not settings.GROQ_API_KEY:
         return None
     if _client is None:
-        _client = Groq(api_key=settings.GROQ_API_KEY)
+        _client = Groq(api_key=settings.GROQ_API_KEY, timeout=30.0)
     return _client
 
 def is_api_configured() -> bool:
@@ -148,7 +149,8 @@ Return ONLY raw JSON matching this structure. Do NOT wrap the response in markdo
 """
     try:
         client = _get_client()
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model=settings.GROQ_MODEL,
             messages=[
                 {"role": "system", "content": "You are a professional AI Research Architect. You respond ONLY with valid JSON. Ensure strings are properly escaped."},
@@ -162,7 +164,8 @@ Return ONLY raw JSON matching this structure. Do NOT wrap the response in markdo
             print(f"JSON Parsing Error in get_differentiation_suggestions: {json_err}. Initiating retry...")
             retry_prompt = f"Your previous response failed to parse as valid JSON due to this error: {str(json_err)}.\nPlease return the exact same content but ensure ALL strings and control characters are properly JSON-escaped. Do NOT include markdown code blocks, just raw JSON."
             try:
-                retry_resp = client.chat.completions.create(
+                retry_resp = await asyncio.to_thread(
+                    client.chat.completions.create,
                     model=settings.GROQ_MODEL,
                     messages=[
                         {"role": "system", "content": "You are a professional AI Research Architect. You respond ONLY with valid JSON. Ensure strings are properly escaped."},
@@ -253,7 +256,8 @@ Do NOT wrap the response in markdown code blocks. Return ONLY raw JSON.
 """
     try:
         client = _get_client()
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model=settings.GROQ_MODEL,
             messages=[
                 {"role": "system", "content": "You are a Principal Software Architect. You respond only with raw JSON matching the request structure."},
@@ -266,7 +270,8 @@ Do NOT wrap the response in markdown code blocks. Return ONLY raw JSON.
             print(f"JSON Parsing Error in get_tech_stack_recommendation: {json_err}. Initiating retry...")
             retry_prompt = f"Your previous response failed to parse as valid JSON due to this error: {str(json_err)}.\nPlease return the exact same content but ensure ALL strings and control characters are properly JSON-escaped. Do NOT include markdown code blocks, just raw JSON."
             try:
-                retry_resp = client.chat.completions.create(
+                retry_resp = await asyncio.to_thread(
+                    client.chat.completions.create,
                     model=settings.GROQ_MODEL,
                     messages=[
                         {"role": "system", "content": "You are a Principal Software Architect. You respond only with raw JSON matching the request structure."},
@@ -340,7 +345,8 @@ Do NOT wrap the response in markdown code blocks. Return ONLY raw valid JSON con
 """
     try:
         client = _get_client()
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model=settings.GROQ_MODEL,
             messages=[
                 {"role": "system", "content": "You are an Elite Software Engineer. You respond only with raw JSON matching the request structure. Ensure all string values are properly JSON-escaped."},
@@ -354,7 +360,8 @@ Do NOT wrap the response in markdown code blocks. Return ONLY raw valid JSON con
             print(f"JSON Parsing Error in generate_code_scaffold: {json_err}. Initiating retry...")
             retry_prompt = f"Your previous response failed to parse as valid JSON due to this error: {str(json_err)}.\nPlease return the exact same file structure but ensure ALL strings are properly JSON-escaped (e.g., escape newlines as \\n). Do NOT include markdown code blocks, just raw JSON."
             try:
-                retry_resp = client.chat.completions.create(
+                retry_resp = await asyncio.to_thread(
+                    client.chat.completions.create,
                     model=settings.GROQ_MODEL,
                     messages=[
                         {"role": "system", "content": "You are an Elite Software Engineer. You respond only with raw JSON matching the request structure. Ensure all string values are properly JSON-escaped."},
@@ -393,7 +400,8 @@ async def get_chat_response(messages_history: List[Dict[str, str]], new_message:
 
     try:
         client = _get_client()
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model=settings.GROQ_MODEL,
             messages=context_msgs
         )

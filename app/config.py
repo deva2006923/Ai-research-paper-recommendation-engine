@@ -14,7 +14,12 @@ if ENV_FILE_PATH.exists():
 
 # Detect if running in Vercel serverless environment
 IS_VERCEL = bool(os.getenv("VERCEL") or os.getenv("VERCEL_ENV"))
-DEFAULT_DB_URL = "sqlite:///:memory:" if IS_VERCEL else f"sqlite:///{BASE_DIR}/app.db"
+DEFAULT_DB_URL = "sqlite:////tmp/app.db" if IS_VERCEL else f"sqlite:///{BASE_DIR}/app.db"
+
+# Force /tmp/app.db on Vercel if DATABASE_URL in env points to a local read-only file
+raw_db_url = os.getenv("DATABASE_URL")
+if IS_VERCEL and raw_db_url and raw_db_url.startswith("sqlite") and "/tmp/" not in raw_db_url and ":memory:" not in raw_db_url:
+    os.environ["DATABASE_URL"] = "sqlite:////tmp/app.db"
 
 class Settings(BaseSettings):
     PORT: int = 8000
@@ -44,7 +49,10 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+if IS_VERCEL and settings.DATABASE_URL.startswith("sqlite") and "/tmp/" not in settings.DATABASE_URL and ":memory:" not in settings.DATABASE_URL:
+    settings.DATABASE_URL = "sqlite:////tmp/app.db"
+
 # Debug print to verify loading during startup
-print("Configuration Loaded successfully. GROQ_API_KEY Configured:", bool(settings.GROQ_API_KEY))
+print("Configuration Loaded successfully. IS_VERCEL:", IS_VERCEL, "DATABASE_URL:", settings.DATABASE_URL, "GROQ_API_KEY Configured:", bool(settings.GROQ_API_KEY))
 
 
