@@ -6,13 +6,33 @@ import jwt
 from sqlalchemy.orm import Session
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+import os
+import hashlib
 import bcrypt
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        if hashed_password.startswith("pbkdf2:"):
+            parts = hashed_password.split(":")
+            if len(parts) == 3:
+                _, salt, original_hash = parts
+                check_hash = hashlib.pbkdf2_hmac('sha256', plain_password.encode('utf-8'), salt.encode('utf-8'), 100000).hex()
+                return check_hash == original_hash
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception as e:
+        print(f"Warning: verify_password fallback triggered: {e}", flush=True)
+        return False
 
 def get_password_hash(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    try:
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    except Exception as e:
+        print(f"Warning: bcrypt hash failed ({e}), using pbkdf2 fallback", flush=True)
+        salt = os.urandom(16).hex()
+        hashed = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt.encode('utf-8'), 100000).hex()
+        return f"pbkdf2:{salt}:{hashed}"
 
 from app.config import settings
 from app.database import get_db

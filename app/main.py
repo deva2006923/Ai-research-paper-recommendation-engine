@@ -1,10 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+import traceback
 from app.config import settings
-from app.database import engine, Base
+from app.database import engine, Base, init_db, SessionLocal
 from app.routers import auth, papers, repos, ai, admin
 from contextlib import asynccontextmanager
-from app.database import SessionLocal
 from app.models import User
 from app.auth import get_password_hash
 
@@ -12,6 +13,7 @@ from app.auth import get_password_hash
 async def lifespan(app: FastAPI):
     # Seed admin user if it doesn't exist
     try:
+        init_db()
         db = SessionLocal()
         try:
             admin_email = "prakasshdeva876@gmail.com"
@@ -28,14 +30,14 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
     except Exception as e:
-        print(f"Warning: Lifespan admin seeding error: {e}")
+        print(f"Warning: Lifespan admin seeding error: {e}", flush=True)
     yield
 
 # Initialize database tables safely on application start
 try:
-    Base.metadata.create_all(bind=engine)
+    init_db()
 except Exception as e:
-    print(f"Warning: Database table creation error: {e}")
+    print(f"Warning: Database table creation error: {e}", flush=True)
 
 app = FastAPI(
     title="AI Research Paper Recommendation Engine API",
@@ -43,6 +45,15 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"CRITICAL: Unhandled Exception on {request.method} {request.url.path}: {exc}", flush=True)
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {str(exc)}"}
+    )
 
 # Set up CORS middleware to support frontend integration
 app.add_middleware(

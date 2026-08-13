@@ -9,6 +9,7 @@ if str(ROOT_DIR) not in sys.path:
 
 try:
     from app.main import app
+    handler = app
 except Exception as e:
     import traceback
     print("CRITICAL: Vercel Serverless Function Startup Error:", e, flush=True)
