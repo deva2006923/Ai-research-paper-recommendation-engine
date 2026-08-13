@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt
 from sqlalchemy.orm import Session
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -70,7 +70,7 @@ def get_current_user(token: Optional[str] = Depends(oauth2_scheme), db: Session 
         if email is None or user_id is None:
             raise credentials_exception
         token_data = TokenData(email=email, user_id=user_id)
-    except JWTError:
+    except jwt.PyJWTError:
         raise credentials_exception
         
     user = db.query(User).filter(User.id == token_data.user_id).first()
