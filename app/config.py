@@ -13,7 +13,7 @@ load_dotenv(dotenv_path=ENV_FILE_PATH)
 
 # Detect if running in Vercel serverless environment
 IS_VERCEL = bool(os.getenv("VERCEL") or os.getenv("VERCEL_ENV"))
-DEFAULT_DB_URL = "sqlite:////tmp/app.db" if IS_VERCEL else f"sqlite:///{BASE_DIR}/app.db"
+DEFAULT_DB_URL = "sqlite:///:memory:" if IS_VERCEL else f"sqlite:///{BASE_DIR}/app.db"
 
 class Settings(BaseSettings):
     PORT: int = 8000
