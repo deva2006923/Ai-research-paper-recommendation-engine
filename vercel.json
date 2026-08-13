@@ -1,14 +1,17 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/(auth|papers|repos|differentiate|tech-stack|generate-code|assistant|admin/stats|docs|openapi.json|redoc|api)(.*)",
-      "destination": "/api/index.py"
+      "src": "/(auth|papers|repos|differentiate|tech-stack|generate-code|assistant|admin/stats|docs|openapi.json|redoc|api)(.*)",
+      "dest": "/api/index.py"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }

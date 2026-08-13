@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_FILE_PATH = BASE_DIR / ".env"
 
-# Explicitly load .env from the project root
-load_dotenv(dotenv_path=ENV_FILE_PATH)
+# Explicitly load .env from the project root if it exists
+if ENV_FILE_PATH.exists():
+    load_dotenv(dotenv_path=ENV_FILE_PATH)
 
 # Detect if running in Vercel serverless environment
 IS_VERCEL = bool(os.getenv("VERCEL") or os.getenv("VERCEL_ENV"))
@@ -35,7 +36,11 @@ class Settings(BaseSettings):
     
     ADMIN_PASSWORD: str = "admin123"
     
-    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE_PATH) if ENV_FILE_PATH.exists() else None,
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
 settings = Settings()
 
