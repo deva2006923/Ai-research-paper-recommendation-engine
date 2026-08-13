@@ -64,6 +64,7 @@ app.include_router(repos.router)
 app.include_router(ai.router)
 app.include_router(admin.router)
 
+@app.get("/api", tags=["Healthcheck"])
 @app.get("/api/health", tags=["Healthcheck"])
 async def healthcheck():
     return {
