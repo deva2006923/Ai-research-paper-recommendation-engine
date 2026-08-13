@@ -14,6 +14,15 @@ class TokenData(BaseModel):
     email: Optional[EmailStr] = None
     user_id: Optional[int] = None
 
+class UserSignup(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
 class UserResponse(BaseModel):
     id: int
     email: EmailStr
@@ -54,8 +63,18 @@ class DifferentiateRequest(BaseModel):
     papers: List[PaperResult]
     repos: List[RepoResult]
 
+class SuggestedProductDirection(BaseModel):
+    title: str
+    description: str
+    feasibility_score: int
+    justification: str
+
 class DifferentiateResponse(BaseModel):
-    suggestions: str
+    existing_landscape_summary: str
+    identified_gap: str
+    why_this_gap_exists: str
+    suggested_product_direction: SuggestedProductDirection
+    suggestions: str  # Markdown summary
 
 class TechStackRequest(BaseModel):
     problem_statement: str
@@ -91,7 +110,47 @@ class ChatResponse(BaseModel):
     response: str
     history: List[ChatMessageResponse]
 
-# --- Admin Stats Schemas ---
+class AdminUserActivitySearch(BaseModel):
+    id: int
+    query: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class AdminUserActivityMessage(BaseModel):
+    id: int
+    role: str
+    content: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class AdminUserActivitySession(BaseModel):
+    id: str
+    title: Optional[str] = None
+    created_at: datetime
+    messages: List[AdminUserActivityMessage] = []
+
+    class Config:
+        from_attributes = True
+
+class AdminUserActivity(BaseModel):
+    user: UserResponse
+    searches: List[AdminUserActivitySearch] = []
+    chat_sessions: List[AdminUserActivitySession] = []
+
+    class Config:
+        from_attributes = True
+
+class UserActivityResponse(BaseModel):
+    user: UserResponse
+    searches: List[AdminUserActivitySearch] = []
+    chat_sessions: List[AdminUserActivitySession] = []
+
+    class Config:
+        from_attributes = True
 class AdminStatsResponse(BaseModel):
     total_users: int
     total_searches: int
@@ -99,3 +158,4 @@ class AdminStatsResponse(BaseModel):
     total_messages: int
     recent_searches: List[Dict[str, Any]]
     recent_users: List[UserResponse]
+    all_users_activity: List[AdminUserActivity] = []

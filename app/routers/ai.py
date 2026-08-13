@@ -24,12 +24,20 @@ async def differentiate(
     Requires authentication.
     """
     try:
-        suggestions = await get_differentiation_suggestions(
+        data = await get_differentiation_suggestions(
             problem_statement=payload.problem_statement,
             papers=payload.papers,
             repos=payload.repos
         )
-        return DifferentiateResponse(suggestions=suggestions)
+        return DifferentiateResponse(
+            existing_landscape_summary=data.get("existing_landscape_summary", "N/A"),
+            identified_gap=data.get("identified_gap", "N/A"),
+            why_this_gap_exists=data.get("why_this_gap_exists", "N/A"),
+            suggested_product_direction=data.get("suggested_product_direction", {
+                "title": "N/A", "description": "N/A", "feasibility_score": 0, "justification": "N/A"
+            }),
+            suggestions=data.get("suggestions", "")
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -49,12 +57,22 @@ async def tech_stack(
         data = await get_tech_stack_recommendation(payload.problem_statement)
         recommendation = data.get("recommendation", {})
         explanation = data.get("explanation", "")
+        if isinstance(explanation, dict):
+            explanation_md = ""
+            for k, v in explanation.items():
+                explanation_md += f"### {k.replace('_', ' ').title()}\n{str(v)}\n\n"
+            explanation = explanation_md
+        elif not isinstance(explanation, str):
+            explanation = str(explanation)
+            
         return TechStackResponse(
             problem_statement=payload.problem_statement,
             recommendation=recommendation,
             explanation=explanation
         )
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate tech stack recommendation: {str(e)}"
@@ -80,8 +98,17 @@ async def generate_code(
         if payload.format == "zip":
             zip_io = io.BytesIO()
             with zipfile.ZipFile(zip_io, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                created_dirs = set()
                 for file_path, file_content in files.items():
-                    zip_file.writestr(file_path, file_content)
+                    file_path = file_path.replace("\\", "/")
+                    parts = file_path.split("/")
+                    for i in range(1, len(parts)):
+                        dir_path = "/".join(parts[:i]) + "/"
+                        if dir_path not in created_dirs:
+                            zinfo = zipfile.ZipInfo(dir_path)
+                            zip_file.writestr(zinfo, "")
+                            created_dirs.add(dir_path)
+                    zip_file.writestr(file_path, str(file_content))
             zip_io.seek(0)
             
             clean_name = "".join(c for c in payload.problem_statement if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_")[:30]
@@ -93,7 +120,8 @@ async def generate_code(
                 headers={"Content-Disposition": f"attachment; filename={filename}"}
             )
         else:
-            return CodeGenerateResponse(files=files)
+            files_str = {str(k): str(v) for k, v in files.items()}
+            return CodeGenerateResponse(files=files_str)
             
     except Exception as e:
         raise HTTPException(

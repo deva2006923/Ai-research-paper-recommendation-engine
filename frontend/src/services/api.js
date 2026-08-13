@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = typeof window !== 'undefined' && window.location.port === '5173'
+  ? 'http://localhost:8000'
+  : '';
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -21,8 +23,42 @@ client.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Response interceptor to handle 401 Unauthorized globally
+client.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Clear token and user from localStorage if authorization fails
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      // Redirect to login page
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const api = {
   // Authentication
+  login: async (email, password) => {
+    // We send form data according to OAuth2PasswordRequestForm standard if backend uses it, 
+    // or standard JSON if the backend expects a JSON body. The prompt said:
+    // "sends a POST request to /auth/login with a JSON body of email and password"
+    const response = await client.post('/auth/login', { email, password });
+    const { access_token, user } = response.data;
+    localStorage.setItem('token', access_token);
+    localStorage.setItem('user', JSON.stringify(user));
+    return response.data;
+  },
+
+  signup: async (name, email, password) => {
+    const response = await client.post('/auth/signup', { name, email, password });
+    const { access_token, user } = response.data;
+    localStorage.setItem('token', access_token);
+    localStorage.setItem('user', JSON.stringify(user));
+    return response.data;
+  },
+
   loginWithGoogle: async (googleToken) => {
     const response = await client.post('/auth/google', { token: googleToken });
     const { access_token, user } = response.data;
@@ -91,8 +127,8 @@ export const api = {
 
   // Retrieve code ZIP as blob (for direct download trigger in React)
   generateCodeZipBlob: async (problemStatement, techStack) => {
-    const response = await axios.post(
-      `${API_BASE_URL}/generate-code`,
+    const response = await client.post(
+      '/generate-code',
       {
         problem_statement: problemStatement,
         tech_stack: techStack,
@@ -100,9 +136,6 @@ export const api = {
       },
       {
         responseType: 'blob',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
       }
     );
     return response.data;
@@ -120,6 +153,12 @@ export const api = {
   // Admin Dashboard Statistics
   getAdminStats: async () => {
     const response = await client.get('/admin/stats');
+    return response.data;
+  },
+
+  // User Dashboard Activity
+  getUserActivity: async () => {
+    const response = await client.get('/auth/me/activity');
     return response.data;
   },
 };

@@ -1,10 +1,22 @@
+import os
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+from dotenv import load_dotenv
+
+# Resolve the absolute path to the project root directory
+BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_FILE_PATH = BASE_DIR / ".env"
+
+# Explicitly load .env from the project root
+load_dotenv(dotenv_path=ENV_FILE_PATH)
 
 class Settings(BaseSettings):
     PORT: int = 8000
     HOST: str = "0.0.0.0"
-    DATABASE_URL: str = "sqlite:///./app.db"
+    
+    # Use absolute path for SQLite to prevent issues when starting from nested dirs
+    DATABASE_URL: str = f"sqlite:///{BASE_DIR}/app.db"
     
     JWT_SECRET_KEY: str = "dev_secret_key_1234567890_change_in_production"
     JWT_ALGORITHM: str = "HS256"
@@ -12,8 +24,18 @@ class Settings(BaseSettings):
     
     GOOGLE_CLIENT_ID: str = ""
     GITHUB_TOKEN: Optional[str] = None
-    GEMINI_API_KEY: Optional[str] = None
+
+    # Groq AI configuration
+    GROQ_API_KEY: Optional[str] = None
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
     
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    ADMIN_PASSWORD: str
+    
+    model_config = SettingsConfigDict(env_file=str(ENV_FILE_PATH), env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
+
+# Debug print to verify loading during startup
+print("Configuration Loaded successfully. GROQ_API_KEY Configured:", bool(settings.GROQ_API_KEY))
+
+

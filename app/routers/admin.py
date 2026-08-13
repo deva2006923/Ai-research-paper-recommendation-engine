@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.database import get_db
@@ -16,7 +16,7 @@ async def get_admin_stats(
 ):
     """
     Get aggregated system statistics.
-    Restricted to devaprakassh49@gmail.com only.
+    Restricted to prakasshdeva876@gmail.com only.
     """
     total_users = db.query(func.count(User.id)).scalar() or 0
     total_searches = db.query(func.count(SearchHistory.id)).scalar() or 0
@@ -39,11 +39,26 @@ async def get_admin_stats(
     recent_users_query = db.query(User).order_by(User.created_at.desc()).limit(10).all()
     recent_users = [UserResponse.model_validate(u) for u in recent_users_query]
 
+    # Fetch all users and their activity
+    all_users_query = db.query(User).options(
+        joinedload(User.searches),
+        joinedload(User.chat_sessions).joinedload(ChatSession.messages)
+    ).all()
+    
+    all_users_activity = []
+    for u in all_users_query:
+        all_users_activity.append({
+            "user": UserResponse.model_validate(u),
+            "searches": u.searches,
+            "chat_sessions": u.chat_sessions
+        })
+
     return AdminStatsResponse(
         total_users=total_users,
         total_searches=total_searches,
         total_sessions=total_sessions,
         total_messages=total_messages,
         recent_searches=recent_searches,
-        recent_users=recent_users
+        recent_users=recent_users,
+        all_users_activity=all_users_activity
     )

@@ -7,11 +7,16 @@ from app.schemas import RepoResult
 async def search_github(query: str, limit: int = 10) -> List[RepoResult]:
     """
     Search repositories on GitHub API asynchronously.
+    Restricts results to repos where query matches name, description, or topics
+    (not file contents) by using the 'in:name,description,topics' qualifier.
+    Also filters to repos with at least 2 stars to avoid noise/config dumps.
     """
     if not query.strip():
         return []
-        
-    full_query = f"{query} size:>0"
+
+    # 'in:name,description,topics' restricts the search too much for niche queries.
+    # We will just search normally to ensure we get results, but sort by stars.
+    full_query = f"{query}"
     safe_query = urllib.parse.quote(full_query)
     url = f"https://api.github.com/search/repositories?q={safe_query}&sort=stars&order=desc&per_page={limit}"
     

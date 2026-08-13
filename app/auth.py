@@ -6,6 +6,13 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+import bcrypt
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+def get_password_hash(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 from app.config import settings
 from app.database import get_db
@@ -72,9 +79,9 @@ def get_current_user(token: Optional[str] = Depends(oauth2_scheme), db: Session 
     return user
 
 def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.email != "devaprakassh49@gmail.com":
+    if current_user.email != "prakasshdeva876@gmail.com":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Admin access restricted to devaprakassh49@gmail.com",
+            detail="Forbidden: Admin access restricted to prakasshdeva876@gmail.com",
         )
     return current_user

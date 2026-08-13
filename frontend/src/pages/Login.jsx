@@ -1,57 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScrollFloat from '../components/ui/ScrollFloat';
 import { api } from '../services/api';
-import { ShieldAlert, LogIn, ArrowRight, Terminal } from 'lucide-react';
+import { ShieldAlert, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function Login({ onLogin }) {
+  const [isLoginMode, setIsLoginMode] = useState(true);
+  
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [googleToken, setGoogleToken] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const navigate = useNavigate();
 
-  const handleBypassLogin = async (bypassEmail, bypassName) => {
-    setIsLoading(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError('');
-    const mockToken = `mock_${bypassName.replace(/\s+/g, '-')}_${bypassEmail}`;
+    setIsLoading(true);
+
     try {
-      const data = await api.loginWithGoogle(mockToken);
-      onLogin(data.user);
+      if (isLoginMode) {
+        if (!email || !password) {
+          setError('Email and password are required.');
+          setIsLoading(false);
+          return;
+        }
+        const data = await api.login(email, password);
+        onLogin(data.user);
+      } else {
+        if (!name || !email || !password || !confirmPassword) {
+          setError('All fields are required.');
+          setIsLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError('Passwords do not match.');
+          setIsLoading(false);
+          return;
+        }
+        const data = await api.signup(name, email, password);
+        onLogin(data.user);
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to bypass login.');
+      let detail = err.response?.data?.detail;
+      
+      // If validation error (422 Unprocessable Entity), detail is an array
+      if (Array.isArray(detail)) {
+        // Extract the first validation message to avoid React crash
+        detail = detail.map(d => `${d.loc[d.loc.length - 1]}: ${d.msg}`).join(', ');
+      } else if (typeof detail !== 'string') {
+        detail = null;
+      }
+
+      if (isLoginMode) {
+        setError(detail || (err.response?.status === 401 ? 'Incorrect email or password.' : 'An error occurred during sign in.'));
+      } else {
+        setError(detail || (err.response?.status === 400 ? 'An account with this email already exists.' : 'An error occurred during sign up.'));
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCustomMockSubmit = async (e) => {
-    e.preventDefault();
-    if (!email || !name) {
-      setError('Name and Email are required.');
-      return;
-    }
-    await handleBypassLogin(email.trim(), name.trim());
-  };
-
-  const handleTokenSubmit = async (e) => {
-    e.preventDefault();
-    if (!googleToken) {
-      setError('Please enter a Google ID token.');
-      return;
-    }
-    setIsLoading(true);
+  const toggleMode = () => {
+    setIsLoginMode(!isLoginMode);
     setError('');
-    try {
-      const data = await api.loginWithGoogle(googleToken);
-      onLogin(data.user);
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Verification failed. Expired token.');
-    } finally {
-      setIsLoading(false);
-    }
+    // Clear fields
+    setEmail('');
+    setPassword('');
+    setName('');
+    setConfirmPassword('');
   };
 
   const StarIcon = ({ size = 20, ...props }) => (
@@ -87,7 +109,7 @@ export default function Login({ onLogin }) {
         className="login-grid"
       >
         {/* Left Column: Product Info & Actions */}
-        <div className="login-hero-container" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div className="login-hero-container" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
             <StarIcon size={24} />
             <span className="jetbrains-mono" style={{ fontWeight: 700, fontSize: '0.875rem', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
@@ -106,127 +128,151 @@ export default function Login({ onLogin }) {
             >
               Research once. Scaffold the same code to every server.
             </ScrollFloat>
-            <p className="body-md" style={{ fontSize: '1rem', color: 'var(--on-surface-muted)', maxWidth: '460px' }}>
+            <p className="body-md" style={{ fontSize: '1rem', color: 'var(--on-surface-muted)', maxWidth: '460px', marginTop: '16px' }}>
               Scholarly Archive searches arXiv and Semantic Scholar concurrently, isolates project differentiators, and auto-generates developer scaffolds in seconds.
             </p>
           </div>
 
-          {error && (
-            <div 
-              style={{ 
-                display: 'flex', 
-                gap: 'var(--space-sm)', 
-                color: 'var(--error)', 
-                backgroundColor: 'rgba(255, 69, 58, 0.08)',
-                border: '1px solid var(--error)',
-                padding: '12px',
-                borderRadius: 'var(--radius-md)',
-                fontSize: '0.875rem',
-                maxWidth: '460px'
-              }}
-            >
-              <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Dithersmith-styled CTA login actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '460px', marginTop: '10px' }}>
-            {/* Primary violet CTA bypass button (like "Get access") */}
-            <button
-              onClick={() => handleBypassLogin('devaprakassh49@gmail.com', 'Admin')}
-              className="btn-cta"
-              disabled={isLoading}
-              style={{ width: '100%', justifyContent: 'space-between' }}
-            >
-              <span>Launch Admin Console (mock)</span>
-              <ArrowRight size={16} />
-            </button>
-
-            {/* Secondary outline researcher bypass */}
-            <button
-              onClick={() => handleBypassLogin('sarah@gmail.com', 'Sarah Jenkins')}
-              className="btn-secondary"
-              disabled={isLoading}
-              style={{ width: '100%', border: '1px solid var(--border-strong)', justifyContent: 'space-between', padding: '12px 20px' }}
-            >
-              <span>Launch Researcher Workspace (mock)</span>
-              <ArrowRight size={16} style={{ color: 'var(--on-surface-muted)' }} />
-            </button>
-          </div>
-
-          {/* Toggle for Advanced Sign-in credentials */}
-          <div style={{ maxWidth: '460px' }}>
-            <button
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              style={{
-                background: 'none',
-                color: 'var(--on-surface-faint)',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                padding: '4px 0'
-              }}
-            >
-              {showAdvanced ? 'Hide advanced sign-in options' : 'Show advanced sign-in options (token verification)'}
-            </button>
-
-            {showAdvanced && (
+          {/* Dithersmith Auth Form */}
+          <div className="halo-card" style={{ maxWidth: '460px', marginTop: '8px' }}>
+            <h2 className="headline-lg" style={{ fontSize: '1.5rem', marginBottom: '24px' }}>
+              {isLoginMode ? 'Sign In' : 'Create Account'}
+            </h2>
+            
+            {error && (
               <div 
-                className="halo-card" 
                 style={{ 
-                  marginTop: '12px', 
-                  padding: '16px', 
-                  backgroundColor: 'var(--surface)', 
-                  border: '1px solid var(--border)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px'
+                  display: 'flex', 
+                  gap: 'var(--space-sm)', 
+                  color: 'var(--error)', 
+                  backgroundColor: 'rgba(255, 69, 58, 0.08)',
+                  border: '1px solid var(--error)',
+                  padding: '12px',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '0.875rem',
+                  marginBottom: '20px'
                 }}
               >
-                {/* Option A: Custom credentials */}
-                <form onSubmit={handleCustomMockSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <span className="label-sm" style={{ fontSize: '0.625rem' }}>Custom mock session profile</span>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <input 
-                      type="text" 
-                      placeholder="Name" 
-                      className="input-field" 
-                      style={{ padding: '8px 12px', fontSize: '0.8125rem' }}
-                      value={name} 
-                      onChange={e => setName(e.target.value)} 
-                    />
-                    <input 
-                      type="email" 
-                      placeholder="Email" 
-                      className="input-field" 
-                      style={{ padding: '8px 12px', fontSize: '0.8125rem' }}
-                      value={email} 
-                      onChange={e => setEmail(e.target.value)} 
-                    />
-                  </div>
-                  <button type="submit" className="btn-primary" style={{ padding: '8px 12px', fontSize: '0.8125rem' }} disabled={isLoading}>
-                    Sign in Custom Profile
-                  </button>
-                </form>
-
-                {/* Option B: Google ID Token */}
-                <form onSubmit={handleTokenSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                  <span className="label-sm" style={{ fontSize: '0.625rem' }}>Verify Google OAuth ID Token</span>
-                  <input 
-                    type="password" 
-                    placeholder="Paste ID Token" 
-                    className="input-field" 
-                    style={{ padding: '8px 12px', fontSize: '0.8125rem' }}
-                    value={googleToken} 
-                    onChange={e => setGoogleToken(e.target.value)} 
-                  />
-                  <button type="submit" className="btn-secondary" style={{ padding: '8px 12px', fontSize: '0.8125rem', gap: '6px' }} disabled={isLoading}>
-                    <LogIn size={12} /> Verify & Log In
-                  </button>
-                </form>
+                <ShieldAlert size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>{error}</span>
               </div>
             )}
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {!isLoginMode && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="label-sm" htmlFor="name">Full Name</label>
+                  <input 
+                    id="name"
+                    type="text" 
+                    placeholder="Jane Doe" 
+                    className="input-field" 
+                    value={name} 
+                    onChange={e => setName(e.target.value)} 
+                    disabled={isLoading}
+                    required={!isLoginMode}
+                  />
+                </div>
+              )}
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="label-sm" htmlFor="email">Email Address</label>
+                <input 
+                  id="email"
+                  type="email" 
+                  placeholder="jane@example.com" 
+                  className="input-field" 
+                  value={email} 
+                  onChange={e => setEmail(e.target.value)} 
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label className="label-sm" htmlFor="password">Password</label>
+                <input 
+                  id="password"
+                  type="password" 
+                  placeholder="••••••••" 
+                  className="input-field" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+
+              {!isLoginMode && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="label-sm" htmlFor="confirmPassword">Confirm Password</label>
+                  <input 
+                    id="confirmPassword"
+                    type="password" 
+                    placeholder="••••••••" 
+                    className="input-field" 
+                    value={confirmPassword} 
+                    onChange={e => setConfirmPassword(e.target.value)} 
+                    disabled={isLoading}
+                    required={!isLoginMode}
+                  />
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                className="btn-primary" 
+                style={{ 
+                  marginTop: '8px', 
+                  borderRadius: 'var(--radius-full)',
+                  padding: '14px 24px',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  opacity: isLoading ? 0.7 : 1
+                }} 
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 size={20} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                ) : (
+                  <>
+                    <span>{isLoginMode ? 'Sign In' : 'Create Account'}</span>
+                    <ArrowRight size={18} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Dithered Divider */}
+            <div style={{ 
+              height: '1px', 
+              width: '100%', 
+              margin: '24px 0',
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'4\' height=\'4\' viewBox=\'0 0 4 4\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Crect width=\'2\' height=\'2\' fill=\'%23FF5C00\' fill-opacity=\'0.3\'/%3E%3C/svg%3E")',
+              backgroundRepeat: 'repeat-x'
+            }} />
+
+            <div style={{ textAlign: 'center' }}>
+              <span className="body-md" style={{ fontSize: '0.875rem' }}>
+                {isLoginMode ? "Don't have an account? " : "Already have an account? "}
+              </span>
+              <button
+                onClick={toggleMode}
+                disabled={isLoading}
+                style={{
+                  background: 'none',
+                  color: 'var(--primary)',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)'
+                }}
+              >
+                {isLoginMode ? 'Create Account' : 'Sign In'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -369,6 +415,10 @@ export default function Login({ onLogin }) {
           75% { transform: translateY(-380px); }
           90% { transform: translateY(-380px); }
           100% { transform: translateY(0); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
         @media (max-width: 768px) {
           .login-grid {

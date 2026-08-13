@@ -17,7 +17,7 @@ export default function Admin() {
     } catch (err) {
       console.error(err);
       if (err.response?.status === 403) {
-        setError('Access Denied: Restricted to devaprakassh49@gmail.com only.');
+        setError('Access Denied: Restricted to prakasshdeva876@gmail.com only.');
       } else {
         setError('Failed to load administrator metrics.');
       }

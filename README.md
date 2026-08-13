@@ -27,7 +27,7 @@ backend/
 │   │   ├── papers.py       # /papers/search
 │   │   ├── repos.py        # /repos/search
 │   │   ├── ai.py           # /differentiate, /tech-stack, /generate-code, /assistant/chat
-│   │   └── admin.py        # /admin/stats (restricted to devaprakassh49@gmail.com)
+│   │   └── admin.py        # /admin/stats (restricted to prakasshdeva876@gmail.com)
 │   └── services/
 │       ├── arxiv_service.py       # Async XML arXiv parser
 │       ├── semantic_scholar.py    # Async Semantic Scholar search client
@@ -110,6 +110,29 @@ Exchange a Google OAuth token for a local session JWT.
     }
   }
   ```
+
+#### `POST /auth/signup`
+Register a new user with an email and password.
+- **Request Body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "securepassword123",
+    "name": "Jane Doe"
+  }
+  ```
+- **Response**: Same JWT token structure as `/auth/google`.
+
+#### `POST /auth/login`
+Authenticate a user with their email and password.
+- **Request Body**:
+  ```json
+  {
+    "email": "user@example.com",
+    "password": "securepassword123"
+  }
+  ```
+- **Response**: Same JWT token structure as `/auth/google`.
 
 ---
 
@@ -259,7 +282,7 @@ Interact with a multi-turn chat assistant. Stores full dialogue histories inside
 ### 5. Administration
 #### `GET /admin/stats`
 Retrieves system aggregates, including users, search records, and session message volumes.
-- **Authorization**: Checked server-side against the authenticated user's email. Restricted strictly to `devaprakassh49@gmail.com`.
+- **Authorization**: Checked server-side against the authenticated user's email. Restricted strictly to `prakasshdeva876@gmail.com`.
 - **Response**:
   ```json
   {
@@ -275,6 +298,39 @@ Retrieves system aggregates, including users, search records, and session messag
         "timestamp": "2026-08-03T14:49:00Z"
       }
     ],
-    "recent_users": [ ... ]
+    "recent_users": [ ... ],
+    "all_users_activity": [
+      {
+        "user": {
+          "id": 2,
+          "email": "researcher@example.com",
+          "name": "Researcher",
+          "picture": null,
+          "created_at": "2026-08-03T14:48:00Z"
+        },
+        "searches": [
+          {
+            "id": 1,
+            "query": "transformer modeling",
+            "timestamp": "2026-08-03T14:49:00Z"
+          }
+        ],
+        "chat_sessions": [
+          {
+            "id": "session-uuid",
+            "title": "Chat about transformers",
+            "created_at": "2026-08-03T14:50:00Z",
+            "messages": [
+              {
+                "id": 1,
+                "role": "user",
+                "content": "Tell me about transformers",
+                "timestamp": "2026-08-03T14:51:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    ]
   }
   ```

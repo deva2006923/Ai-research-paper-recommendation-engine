@@ -6,7 +6,7 @@ import { api } from '../services/api';
 import { 
   FileText, Target, Layers, Code, Download, ExternalLink, 
   Loader2, Sparkles, RefreshCw, ChevronRight, FileCode,
-  X, Copy, Check
+  X, Copy, Check, Zap
 } from 'lucide-react';
 
 const Github = ({ size = 24, ...props }) => (
@@ -32,11 +32,16 @@ export default function Results({ query, limit }) {
   const [loadingStep, setLoadingStep] = useState('');
   const [papers, setPapers] = useState([]);
   const [repos, setRepos] = useState([]);
-  const [differentiation, setDifferentiation] = useState('');
+  const [differentiation, setDifferentiation] = useState(null);
   const [techStack, setTechStack] = useState(null);
+  const [selectedStack, setSelectedStack] = useState({});
+  const [regeneratingScaffold, setRegeneratingScaffold] = useState(false);
   const [scaffoldFiles, setScaffoldFiles] = useState({});
   const [downloadingZip, setDownloadingZip] = useState(false);
   const [error, setError] = useState('');
+  const [scaffoldError, setScaffoldError] = useState('');
+  const [scaffoldSuccess, setScaffoldSuccess] = useState(false);
+  const [scaffoldLastUpdated, setScaffoldLastUpdated] = useState(null);
   const [activePaper, setActivePaper] = useState(null);
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('papers');
@@ -57,19 +62,40 @@ export default function Results({ query, limit }) {
 
       setLoadingStep('Synthesizing product differentiation angles...');
       const diffResults = await api.getDifferentiation(query, paperResults, repoResults);
-      setDifferentiation(diffResults.suggestions);
+      setDifferentiation(diffResults);
 
       setLoadingStep('Recommending architectural tech stack...');
       const stackResults = await api.getTechStack(query);
       setTechStack(stackResults);
 
+      const initialStack = {};
+      if (stackResults.recommendation) {
+        Object.entries(stackResults.recommendation).forEach(([layer, options]) => {
+          if (Array.isArray(options)) {
+            const recommendedIdx = options.findIndex(opt => opt.recommended);
+            initialStack[layer] = recommendedIdx !== -1 ? recommendedIdx : 0;
+          } else {
+            initialStack[layer] = 0; // Not an array, dummy value
+          }
+        });
+      }
+      setSelectedStack(initialStack);
+
       setLoadingStep('Generating starter code scaffold files...');
-      const codeResults = await api.generateCodeJson(query, stackResults.recommendation);
+      const customTechStack = {};
+      Object.entries(initialStack).forEach(([layer, selectedIdx]) => {
+          const options = stackResults.recommendation[layer];
+          const selectedOption = Array.isArray(options) ? options[selectedIdx] : options;
+          customTechStack[layer] = selectedOption;
+      });
+      const codeResults = await api.generateCodeJson(query, customTechStack);
       setScaffoldFiles(codeResults.files || codeResults);
 
     } catch (err) {
-      console.error(err);
-      setError('An error occurred while compiling your architecture report.');
+      console.error('Pipeline Error:', err);
+      // Surface actual error from the API response or use error message
+      const actualError = err.response?.data?.detail || err.message || 'An unknown error occurred';
+      setError(`Pipeline Error: ${actualError}`);
     } finally {
       setLoading(false);
     }
@@ -83,7 +109,13 @@ export default function Results({ query, limit }) {
     if (!techStack) return;
     setDownloadingZip(true);
     try {
-      const blob = await api.generateCodeZipBlob(query, techStack.recommendation);
+      const customTechStack = {};
+      Object.entries(selectedStack).forEach(([layer, selectedIdx]) => {
+          const options = techStack.recommendation[layer];
+          const selectedOption = Array.isArray(options) ? options[selectedIdx] : options;
+          customTechStack[layer] = selectedOption;
+      });
+      const blob = await api.generateCodeZipBlob(query, customTechStack);
       const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement('a');
       link.href = url;
@@ -122,6 +154,31 @@ export default function Results({ query, limit }) {
       if (!cleanLine) return <div key={idx} style={{ height: '8px' }} />;
       return <p key={idx} style={{ marginBottom: '10px', color: 'var(--on-surface-muted)', fontSize: '0.9375rem' }}>{cleanLine}</p>;
     });
+  };
+
+  const handleRegenerateScaffold = async () => {
+    if (!techStack || !selectedStack) return;
+    setRegeneratingScaffold(true);
+    setScaffoldSuccess(false);
+    try {
+      const customTechStack = {};
+      Object.entries(selectedStack).forEach(([layer, selectedIdx]) => {
+          const options = techStack.recommendation[layer];
+          const selectedOption = Array.isArray(options) ? options[selectedIdx] : options;
+          customTechStack[layer] = selectedOption;
+      });
+      const codeResults = await api.generateCodeJson(query, customTechStack);
+      setScaffoldFiles(codeResults.files || codeResults);
+      setScaffoldError('');
+      setScaffoldLastUpdated(new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+      setScaffoldSuccess(true);
+      setTimeout(() => setScaffoldSuccess(false), 3000);
+    } catch (err) {
+      console.error('Failed to regenerate scaffold.', err);
+      setScaffoldError("Failed to regenerate scaffold: " + (err.response?.data?.detail || err.message || 'Unknown error'));
+    } finally {
+      setRegeneratingScaffold(false);
+    }
   };
 
   if (loading) {
@@ -503,17 +560,86 @@ export default function Results({ query, limit }) {
 
             {activeTab === 'gaps' && (
               /* Card 3: Product Differentiation */
-              <div id="card-differentiation" className="halo-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="label-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--on-surface)' }}>
-                    <Target size={16} /> Market Gaps & Product Differentiation
-                  </span>
-                  <span className="label-sm" style={{ fontSize: '0.625rem' }}>AI Synthesis</span>
-                </div>
+              <div id="card-differentiation" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
+                {differentiation ? (
+                  <>
+                    <div className="halo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="label-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--on-surface)' }}>
+                          <Target size={16} /> Existing Landscape Summary
+                        </span>
+                      </div>
+                      <div style={{ backgroundColor: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+                        <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--on-surface)', whiteSpace: 'pre-wrap' }}>
+                          {differentiation.existing_landscape_summary?.replace(/\\n/g, '\n')}
+                        </p>
+                      </div>
+                    </div>
 
-                <div style={{ backgroundColor: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '24px' }}>
-                  {parseMarkdown(differentiation)}
-                </div>
+                    <div className="halo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderColor: 'var(--primary)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="label-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--primary)' }}>
+                          <Target size={16} /> Identified Gap
+                        </span>
+                        <span className="label-sm" style={{ fontSize: '0.625rem', color: 'var(--primary)' }}>Genuinely New Direction</span>
+                      </div>
+                      <div style={{ backgroundColor: 'rgba(255, 92, 0, 0.05)', border: '1px solid var(--primary)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+                        <p style={{ fontSize: '0.95rem', fontWeight: 500, lineHeight: 1.6, color: 'var(--on-surface)', whiteSpace: 'pre-wrap' }}>
+                          {differentiation.identified_gap?.replace(/\\n/g, '\n')}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="halo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="label-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--on-surface)' }}>
+                          <Layers size={16} /> Why This Gap Exists
+                        </span>
+                      </div>
+                      <div style={{ backgroundColor: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+                        <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--on-surface-muted)', whiteSpace: 'pre-wrap' }}>
+                          {differentiation.why_this_gap_exists?.replace(/\\n/g, '\n')}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="halo-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'linear-gradient(to bottom right, var(--surface), var(--elevated))' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="label-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--success)' }}>
+                          <Zap size={16} /> Suggested Product Direction
+                        </span>
+                      </div>
+                      <div style={{ backgroundColor: 'var(--elevated)', border: '1px solid var(--success)', borderRadius: 'var(--radius-md)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--on-surface)' }}>
+                            {differentiation.suggested_product_direction?.title}
+                          </h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--success)' }}>
+                              {differentiation.suggested_product_direction?.feasibility_score}/10
+                            </span>
+                            <span style={{ fontSize: '0.625rem', color: 'var(--on-surface-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Feasibility
+                            </span>
+                          </div>
+                        </div>
+                        <p style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--on-surface)', whiteSpace: 'pre-wrap' }}>
+                          {differentiation.suggested_product_direction?.description?.replace(/\\n/g, '\n')}
+                        </p>
+                        <div style={{ marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+                          <span className="label-sm" style={{ color: 'var(--on-surface-muted)', marginBottom: '4px', display: 'block' }}>Justification</span>
+                          <p style={{ fontSize: '0.8125rem', color: 'var(--on-surface-faint)', whiteSpace: 'pre-wrap' }}>
+                            {differentiation.suggested_product_direction?.justification?.replace(/\\n/g, '\n')}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '40px', color: 'var(--on-surface-muted)' }}>
+                    <p>No differentiation data available.</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -534,11 +660,25 @@ export default function Results({ query, limit }) {
                       <div 
                         style={{ 
                           display: 'grid', 
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
                           gap: 'var(--space-md)' 
                         }}
                       >
-                        {Object.entries(techStack.recommendation).map(([layer, info], idx) => (
+                        {Object.entries(techStack.recommendation).map(([layer, options], idx) => {
+                          const isArray = Array.isArray(options);
+                          const selectedIdx = selectedStack[layer];
+                          const selectedOption = isArray 
+                            ? options[selectedIdx] || options[0] 
+                            : options;
+                          
+                          const getComplexityColor = (complexity) => {
+                            if (complexity === 'Beginner') return 'var(--success)';
+                            if (complexity === 'Intermediate') return 'var(--warning)';
+                            if (complexity === 'Advanced') return 'var(--error)';
+                            return 'var(--primary)';
+                          };
+                            
+                          return (
                           <div 
                             key={idx} 
                             className="halo-card" 
@@ -547,18 +687,61 @@ export default function Results({ query, limit }) {
                               backgroundColor: 'var(--elevated)', 
                               display: 'flex', 
                               flexDirection: 'column', 
-                              gap: '8px' 
+                              gap: '12px' 
                             }}
                           >
                             <span className="label-sm" style={{ fontSize: '0.625rem' }}>{layer}</span>
-                            <span className="jetbrains-mono" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary)' }}>
-                              {info.technology}
-                            </span>
+                            
+                            {isArray ? (
+                              <select 
+                                value={selectedIdx !== undefined ? selectedIdx : 0}
+                                onChange={(e) => setSelectedStack(prev => ({ ...prev, [layer]: parseInt(e.target.value) }))}
+                                className="jetbrains-mono"
+                                style={{
+                                  backgroundColor: 'var(--surface)',
+                                  color: 'var(--on-surface)',
+                                  border: '1px solid var(--border)',
+                                  borderRadius: '6px',
+                                  padding: '8px',
+                                  fontSize: '0.875rem',
+                                  outline: 'none',
+                                  width: '100%',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                {options.map((opt, oIdx) => (
+                                  <option key={oIdx} value={oIdx}>
+                                    {opt.name} {opt.recommended ? '(Default)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="jetbrains-mono" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--primary)' }}>
+                                {selectedOption.technology || selectedOption.name}
+                              </span>
+                            )}
+                            
+                            {selectedOption.complexity && (
+                              <span style={{ 
+                                display: 'inline-block', 
+                                padding: '2px 8px', 
+                                borderRadius: '12px', 
+                                fontSize: '0.625rem', 
+                                fontWeight: 600,
+                                alignSelf: 'flex-start',
+                                backgroundColor: `color-mix(in srgb, ${getComplexityColor(selectedOption.complexity)} 15%, transparent)`,
+                                color: getComplexityColor(selectedOption.complexity),
+                                border: `1px solid color-mix(in srgb, ${getComplexityColor(selectedOption.complexity)} 30%, transparent)`
+                              }}>
+                                {selectedOption.complexity}
+                              </span>
+                            )}
+
                             <p style={{ fontSize: '0.75rem', color: 'var(--on-surface-muted)', lineHeight: 1.4 }}>
-                              {info.reason}
+                              {selectedOption.reason || selectedOption.description}
                             </p>
                           </div>
-                        ))}
+                        )})}
                       </div>
 
                       <div style={{ backgroundColor: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '24px', marginTop: '4px' }}>
@@ -574,19 +757,47 @@ export default function Results({ query, limit }) {
                     <span className="label-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--on-surface)' }}>
                       <Code size={16} /> Starter Code Scaffold
                     </span>
-                    <button 
-                      className="btn-primary" 
-                      onClick={handleDownloadZip}
-                      disabled={downloadingZip}
-                      style={{ padding: '6px 16px', fontSize: '0.8125rem', borderRadius: '9999px' }}
-                    >
-                      {downloadingZip ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />} 
-                      Download Zip Scaffold
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      {scaffoldSuccess && (
+                        <span style={{ color: 'var(--primary)', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '4px', animation: 'fadeIn 0.3s ease' }}>
+                          <Check size={14} /> Regenerated!
+                        </span>
+                      )}
+                      <button 
+                        className="btn-secondary" 
+                        onClick={handleRegenerateScaffold}
+                        disabled={regeneratingScaffold || downloadingZip}
+                        style={{ padding: '6px 16px', fontSize: '0.8125rem', borderRadius: '9999px', border: '1px solid var(--border-strong)', backgroundColor: 'transparent', color: 'var(--on-surface)', cursor: 'pointer' }}
+                      >
+                        {regeneratingScaffold ? <Loader2 className="animate-spin" size={14} style={{display: 'inline-block', verticalAlign: 'middle'}}/> : <RefreshCw size={14} style={{display: 'inline-block', verticalAlign: 'middle'}}/>} 
+                        <span style={{display: 'inline-block', verticalAlign: 'middle', marginLeft: '6px'}}>Regenerate Scaffold</span>
+                      </button>
+                      <button 
+                        className="btn-primary" 
+                        onClick={handleDownloadZip}
+                        disabled={downloadingZip || regeneratingScaffold}
+                        style={{ padding: '6px 16px', fontSize: '0.8125rem', borderRadius: '9999px', cursor: 'pointer' }}
+                      >
+                        {downloadingZip ? <Loader2 className="animate-spin" size={14} style={{display: 'inline-block', verticalAlign: 'middle'}}/> : <Download size={14} style={{display: 'inline-block', verticalAlign: 'middle'}}/>} 
+                        <span style={{display: 'inline-block', verticalAlign: 'middle', marginLeft: '6px'}}>Download Zip Scaffold</span>
+                      </button>
+                    </div>
+                    {scaffoldError && (
+                      <div style={{ color: 'var(--error)', fontSize: '0.875rem', marginTop: '12px', padding: '8px', backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--error)', borderRadius: '6px' }}>
+                        {scaffoldError}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                    <span className="label-sm" style={{ fontSize: '0.625rem', color: 'var(--on-surface-muted)' }}>Generated File Scaffold Structure</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="label-sm" style={{ fontSize: '0.625rem', color: 'var(--on-surface-muted)' }}>Generated File Scaffold Structure</span>
+                      {scaffoldLastUpdated && (
+                        <span style={{ fontSize: '0.625rem', color: 'var(--on-surface-muted)', fontFamily: 'JetBrains Mono, monospace' }}>
+                          Last updated {scaffoldLastUpdated}
+                        </span>
+                      )}
+                    </div>
                     
                     <div 
                       className="jetbrains-mono" 

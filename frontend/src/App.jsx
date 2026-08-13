@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Input from './pages/Input';
 import Results from './pages/Results';
 import Admin from './pages/Admin';
+import Dashboard from './pages/Dashboard';
 import AssistantPanel from './components/AssistantPanel';
 import ForgeEmbers from './components/ui/ForgeEmbers';
 
@@ -37,10 +38,26 @@ function InnerApp() {
     setLimit(newLimit);
   };
 
+  useEffect(() => {
+    const handleOpenAssistant = () => setIsAssistantOpen(true);
+    window.addEventListener('open-assistant', handleOpenAssistant);
+    return () => window.removeEventListener('open-assistant', handleOpenAssistant);
+  }, []);
+
   // Protected route wrapper
   const ProtectedRoute = ({ children }) => {
     if (!user) {
       return <Navigate to="/login" replace />;
+    }
+    return children;
+  };
+
+  const AdminRoute = ({ children }) => {
+    if (!user) {
+      return <Navigate to="/login" replace />;
+    }
+    if (user.email !== 'prakasshdeva876@gmail.com') {
+      return <Navigate to="/dashboard" replace />;
     }
     return children;
   };
@@ -52,7 +69,7 @@ function InnerApp() {
   const renderHeader = () => {
     if (!user || location.pathname === '/login') return null;
 
-    const isAdmin = user.email === 'devaprakassh49@gmail.com';
+    const isAdmin = user.email === 'prakasshdeva876@gmail.com';
 
     const StarIcon = ({ size = 16, ...props }) => (
       <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" {...props}>
@@ -128,6 +145,11 @@ function InnerApp() {
           {query && (
             <Link to="/results" style={navItemStyle(isActive('/results'))}>
               Results
+            </Link>
+          )}
+          {!isAdmin && (
+            <Link to="/dashboard" style={navItemStyle(isActive('/dashboard'))}>
+              <Terminal size={12} /> Dashboard
             </Link>
           )}
           {isAdmin && (
@@ -231,11 +253,19 @@ function InnerApp() {
             } 
           />
           <Route 
-            path="/admin" 
+            path="/dashboard" 
             element={
               <ProtectedRoute>
-                <Admin />
+                <Dashboard />
               </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin" 
+            element={
+              <AdminRoute>
+                <Admin />
+              </AdminRoute>
             } 
           />
           <Route path="*" element={<Navigate to="/" replace />} />
