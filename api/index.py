@@ -36,4 +36,16 @@ try:
 except Exception as e:
     print("CRITICAL: Vercel Serverless Function Startup Error:", e, flush=True)
     traceback.print_exc()
-    raise e
+    # Define a fallback ASGI app so Vercel doesn't crash the worker, but returns the error to the browser
+    error_msg = f"CRITICAL STARTUP ERROR:\n{e}\n\n{traceback.format_exc()}"
+    async def app(scope, receive, send):
+        if scope["type"] == "http":
+            await send({
+                "type": "http.response.start",
+                "status": 500,
+                "headers": [(b"content-type", b"text/plain")],
+            })
+            await send({
+                "type": "http.response.body",
+                "body": error_msg.encode(),
+            })
